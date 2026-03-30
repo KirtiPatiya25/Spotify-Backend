@@ -1,17 +1,55 @@
 const express = require("express");
 const musicController = require("../controllers/music.controllers");
 const multer = require("multer");
+const authMiddleware = require("../middlewares/auth.middleware");
+const { isArtist } = require("../middlewares/auth.middleware");
 
+const router = express.Router();
+
+// 📦 Multer setup (for audio upload)
 const upload = multer({
     storage: multer.memoryStorage(),
 });
 
-const router = express.Router();
 
-// Upload music file
-router.post("/upload", upload.single("audio"), musicController.createMusic);
+// 🎵 UPLOAD MUSIC (Protected)
+router.post(
+  "/upload",
+  authMiddleware,
+  isArtist,
+  upload.single("audio"),
+  musicController.createMusic
+);
 
-// Create album
-router.post("/album", musicController.createAlbum);
+
+// 💿 CREATE ALBUM (Protected)
+router.post(
+  "/album",
+  authMiddleware,
+  isArtist,
+  musicController.createAlbum
+);
+
+
+// 📀 GET ALL MUSIC (Public)
+router.get(
+  "/",
+  musicController.getAllMusic
+);
+
+
+// 💿 GET ALBUM BY ID (Public)
+router.get(
+  "/album/:id",
+  musicController.getAlbumById
+);
+
+
+// 🎧 GET SINGLE MUSIC (Public)
+router.get(
+  "/:id",
+  musicController.getMusicById
+);
+
 
 module.exports = router;

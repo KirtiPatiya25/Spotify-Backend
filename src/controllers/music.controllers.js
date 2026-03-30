@@ -1,29 +1,16 @@
 const musicModel = require("../models/music.model");
 const albumModel = require("../models/album.model");
 const { uploadFile } = require("../services/storage.service");
-const jwt = require("jsonwebtoken");
 
 // 🎵 CREATE MUSIC
 async function createMusic(req, res) {
     console.log("FILE:", req.file);
     console.log("BODY:", req.body);
 
-    const token = req.headers.authorization?.split(" ")[1];
+    // ✅ user comes from middleware
+    const user = req.user;
 
-    if (!token) {
-        return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    let decoded;
-
-    try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (err) {
-        console.log("JWT ERROR:", err.message);
-        return res.status(401).json({ message: "Invalid token" });
-    }
-
-    if (decoded.role !== "artist") {
+    if (user.role !== "artist") {
         return res.status(403).json({
             message: "You don't have access to create music",
         });
@@ -39,13 +26,12 @@ async function createMusic(req, res) {
     }
 
     try {
-        // Upload file
         const result = await uploadFile(file.buffer.toString("base64"));
 
         const music = await musicModel.create({
             uri: result.url,
             title,
-            artist: decoded.id,
+            artist: user.id, // ✅ from middleware
         });
 
         return res.status(201).json({
@@ -68,22 +54,9 @@ async function createMusic(req, res) {
 
 // 💿 CREATE ALBUM
 async function createAlbum(req, res) {
-    const token = req.headers.authorization?.split(" ")[1];
+    const user = req.user;
 
-    if (!token) {
-        return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    let decoded;
-
-    try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (err) {
-        console.log("JWT ERROR:", err.message);
-        return res.status(401).json({ message: "Invalid token" });
-    }
-
-    if (decoded.role !== "artist") {
+    if (user.role !== "artist") {
         return res.status(403).json({
             message: "You dont have access to create album",
         });
@@ -100,8 +73,8 @@ async function createAlbum(req, res) {
     try {
         const album = await albumModel.create({
             title,
-            artist: decoded.id,
-            musics: musicIds || [], // ✅ FIXED
+            artist: user.id, // ✅ from middleware
+            musics: musicIds || [],
         });
 
         return res.status(201).json({
@@ -122,4 +95,91 @@ async function createAlbum(req, res) {
     }
 }
 
-module.exports = { createMusic, createAlbum };
+// 📀 GET ALL MUSIC
+async function getAllMusic(req, res) {
+    try {
+        const musics = await musicModel
+            .find()
+            .populate("artist", "username email");
+
+        return res.status(200).json({
+            message: "Music fetched successfully",
+            musics
+        });
+
+    } catch (err) {
+        console.log("GET MUSIC ERROR:", err.message);
+        return res.status(500).json({
+            message: "Error fetching music"
+        });
+    }
+}
+
+
+// 💿 GET ALBUM BY ID
+async function getAlbumById(req, res) {
+    try {
+        const { id } = req.params;
+
+        const album = await albumModel
+            .findById(id)
+            .populate("artist", "username")
+            .populate("musics");
+
+        if (!album) {
+            return res.status(404).json({
+                message: "Album not found"
+            });
+        }
+
+        return res.status(200).json({
+            message: "Album fetched successfully",
+            album
+        });
+
+    } catch (err) {
+        console.log("GET ALBUM ERROR:", err.message);
+        return res.status(500).json({
+            message: "Error fetching album"
+        });
+    }
+}
+
+// 🎧 GET SINGLE MUSIC
+async function getMusicById(req, res) {
+    try {
+        const { id } = req.params;
+
+        const music = await musicModel.findById(id);
+
+        if (!music) {
+            return res.status(404).json({
+                message: "Music not found"
+            });
+        }
+
+        return res.status(200).json({
+            message: "Music fetched successfully",
+            music
+        });
+
+    } catch (err) {
+        console.log("GET MUSIC ERROR:", err.message);
+        return res.status(500).json({
+            message: "Error fetching music"
+        });
+    }
+}
+
+
+module.exports = { 
+    createMusic, 
+    createAlbum,
+    getAllMusic,
+    getAlbumById,   // ✅ ADD
+    getMusicById    // ✅ ADD
+};
+
+
+
+
